@@ -24,54 +24,51 @@ const categories = [
     { designacao: "microondas", pai: "encastre" },
     { designacao: "fornos", pai: "encastre" },
 ]
-module.exports =
-{
-    insertCategories: async (connection) => new Promise((resolve,reject) => {
 
-        //let catI = makeIterator(categories)
+const insertCategories = (connection) => new Promise(async (resolve, reject) => {
 
-        let i = 0;
-        function insertCategory(cat,pID) {
-            i++;
-            if (Number.isInteger(pID)) {
-                request = new Request("INSERT dbo.categoria (designacao,id_categoria_pai) OUTPUT INSERTED.id VALUES (@designacao,@id_pai);", function (err) {
-                    if (err) {
-                        console.log(err);
-                        reject(false);
-                    }
-                });
-                request.addParameter('designacao', TYPES.NVarChar, cat.designacao);
-                request.addParameter('id_pai', TYPES.Int, pID);
-                request.on('row', function (columns) {
-                    columns.forEach(function (column) {
-                        if (column.value === null) {
-                            console.log('NULL');
-                        } else {
-                            console.log("Category id of inserted item is " + column.value);
-                        }
-                    });
-                });
-                request.on('requestCompleted', function () {
-                    if(categories[i] === undefined){
-                        //Chegou ao fim
-                        resolve(true);
-                    } else {
-                        insertCategory(categories[i],categories[i].pai)
-                    }
-                });
-                connection.execSql(request);
-            } else {
-                getPartentCatId(cat.pai).then(pID => {
-                    if(!pID) {
-                        reject(false)
-                    }
-                    insertCategory(cat,pID)
-                });
-            }
+    //let catI = makeIterator(categories)
 
+    let i = 0;
+    for (let cat of categories) {
+        if (cat.pai !== 0) {
+            let pID = await getPartentCatId(cat.pai)
+            cat.pID = pID
+        } else {
+            cat.pID = 0
         }
+        res = await insertCategory(cat)
+    }
+    resolve(true)
 
-        getPartentCatId = (pCat) => new Promise((resolve, reject) => {
+    
+
+    function insertCategory(cat) {
+        return new Promise((resolve, reject) => {
+            request = new Request("INSERT dbo.categoria (designacao,id_categoria_pai) OUTPUT INSERTED.id VALUES (@designacao,@id_pai);", function (err) {
+                if (err) {
+                    console.log(err);
+                    reject(false);
+                }
+                resolve(true)
+            });
+            request.addParameter('designacao', TYPES.NVarChar, cat.designacao);
+            request.addParameter('id_pai', TYPES.Int, cat.pID === 0 ? null : cat.pID);
+            request.on('row', function (columns) {
+                columns.forEach(function (column) {
+                    if (column.value === null) {
+                        console.log('NULL');
+                    } else {
+                        console.log("Category id of inserted item is " + column.value);
+                    }
+                });
+            });
+            connection.execSql(request);
+        })
+    }
+
+    function getPartentCatId(pCat) {
+        return new Promise((resolve, reject) => {
             let pCatId = false;
             const request = new Request('select id from dbo.categoria where designacao like @designacao', (err, rowCount) => {
                 if (err) {
@@ -91,8 +88,9 @@ module.exports =
             });
             connection.execSql(request);
         });
+    }
 
-        insertCategory(categories[0],categories[0].pai)
-        
-    })
-}
+})
+
+exports.categories = categories
+exports.insertCategories = insertCategories

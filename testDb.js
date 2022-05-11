@@ -2,6 +2,7 @@ var Connection = require('tedious').Connection;
 var Categorias = require('./categorias');
 var Request = require('tedious').Request;
 var TYPES = require('tedious').TYPES;
+var products = require('./produtos')
 
 var config = {
     server: '172.28.48.1',  //update me
@@ -32,6 +33,11 @@ connection.on('connect', async function (err) {
         connection.close();
     }
     console.log("Categorias adicionadas com sucesso");
+    res = await products.addProducts(connection)
+    if(!res){
+        console.log("Erro ao adicionar produtos");
+        connection.close();
+    }
     connection.close();
 });
 

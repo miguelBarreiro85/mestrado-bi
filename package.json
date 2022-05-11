@@ -1,8 +1,13 @@
 {
   "dependencies": {
+    "@types/tedious": "^4.0.7",
+    "csv-parser": "^3.0.0",
     "ean-generator": "^0.0.8",
     "randexp": "^0.5.3",
     "randomstring": "^1.2.2",
     "tedious": "^14.5.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.6.4"
   }
 }
