@@ -17,8 +17,8 @@ const fs = require('fs');
 const RandExp = require('randexp'); // must require on node
 const connection = new tedious_1.Connection(connection_1.config);
 const getClients = () => new Promise((resolve, reject) => {
-    let clientes = [];
-    fs.createReadStream('clientes.csv')
+    let pessoas = [];
+    fs.createReadStream('pessoas.csv')
         .pipe(csv(['nif', 'nome', 'genero', 'data_nasc', 'id_codigo_postal']))
         .on('data', (row) => __awaiter(void 0, void 0, void 0, function* () {
         // @ts-ignore
@@ -29,16 +29,16 @@ const getClients = () => new Promise((resolve, reject) => {
         // @ts-ignore
         row.id_codigo_postal = parseInt(row.id_codigo_postal);
         delete row.nome;
-        clientes.push(row);
+        pessoas.push(row);
     }))
         .on('end', () => {
-        resolve(clientes);
+        resolve(pessoas);
     });
 });
 function insertClients() {
     return __awaiter(this, void 0, void 0, function* () {
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
-            const clientes = yield getClients();
+            const pessoas = yield getClients();
             const bulkLoad = connection.newBulkLoad('dbo.pessoa', function (error, rowCount) {
                 if (error) {
                     console.log(error);
@@ -57,7 +57,7 @@ function insertClients() {
             bulkLoad.addColumn('id_codigo_postal', tedious_2.TYPES.Int, { nullable: false });
             // execute
             // @ts-ignore
-            connection.execBulkLoad(bulkLoad, clientes);
+            connection.execBulkLoad(bulkLoad, pessoas);
         }));
     });
 }
