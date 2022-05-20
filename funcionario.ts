@@ -61,8 +61,10 @@ connection.on('connect', async function (err) {
         exit
     }
     funcionarios = funcionarios.map((pessoa : any) => {
-        pessoa.preco_hora = Math.floor(Math.random() * (50 - 20) + 20)
-        pessoa.ordenado_mensal = Math.floor(Math.random() * (3000 - 800) + 800)
+        const ordenado = Math.floor(Math.random() * (3000 - 800) + 800)
+        const preco_hora = Math.floor(50 * ordenado / 3000)
+        pessoa.preco_hora = preco_hora
+        pessoa.ordenado_mensal = ordenado
         return pessoa
     })
     const res : any = await insertFuncionarios(funcionarios).catch(err => {

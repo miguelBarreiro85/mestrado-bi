@@ -1,5 +1,5 @@
 export const config = {
-    server: '192.168.144.1',  //update me
+    server: '172.25.240.1',  //update me
     authentication: {
         type: 'default',
         options: {

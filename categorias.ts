@@ -1,8 +1,16 @@
-var Request = require('tedious').Request;
-var TYPES = require('tedious').TYPES;
+import { Request } from "tedious";
+import { TYPES } from "tedious";
+import { Connection } from "tedious";
+import { config } from "./connection";
 
-
-const categories = [
+const connection = new Connection(config);
+export interface categoriaI {
+    designacao: string;
+    pai: 0 | string;
+    catID?: number;
+    pID?:number;
+}
+export const categorias : categoriaI[] = [
     { designacao: "linha_castanha", pai: 0 },
     { designacao: "linha_branca", pai: 0 },
     { designacao: "encastre", pai: 0 },
@@ -25,27 +33,25 @@ const categories = [
     { designacao: "fornos", pai: "encastre" },
 ]
 
-const insertCategories = (connection) => new Promise(async (resolve, reject) => {
-
-    //let catI = makeIterator(categories)
+export const insertCategories = () => new Promise(async (resolve, reject) => {
 
     let i = 0;
-    for (let cat of categories) {
+    for (let cat of categorias) {
         if (cat.pai !== 0) {
             let pID = await getPartentCatId(cat.pai)
             cat.pID = pID
         } else {
             cat.pID = 0
         }
-        res = await insertCategory(cat)
+        await insertCategory(cat)
     }
     resolve(true)
 
     
 
-    function insertCategory(cat) {
+    function insertCategory(cat: categoriaI) {
         return new Promise((resolve, reject) => {
-            request = new Request("INSERT dbo.categoria (designacao,id_categoria_pai) OUTPUT INSERTED.id VALUES (@designacao,@id_pai);", function (err) {
+            const request = new Request("INSERT dbo.categoria (designacao,id_categoria_pai) OUTPUT INSERTED.id VALUES (@designacao,@id_pai);", function (err) {
                 if (err) {
                     console.log(err);
                     reject(false);
@@ -67,12 +73,12 @@ const insertCategories = (connection) => new Promise(async (resolve, reject) => 
         })
     }
 
-    function getPartentCatId(pCat) {
+    function getPartentCatId(pCat :string) : Promise<number> {
         return new Promise((resolve, reject) => {
-            let pCatId = false;
+            let pCatId = 0;
             const request = new Request('select id from dbo.categoria where designacao like @designacao', (err, rowCount) => {
                 if (err) {
-                    reject(false)
+                    reject(0)
                 }
                 resolve(pCatId);
             });
@@ -92,5 +98,4 @@ const insertCategories = (connection) => new Promise(async (resolve, reject) => 
 
 })
 
-exports.categories = categories
-exports.insertCategories = insertCategories
+
