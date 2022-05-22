@@ -57,11 +57,17 @@ const insertAssistencias = () => new Promise( async (resolve,reject) => {
         const idCliente = cIds[Math.round(Math.random() * cIds.length)]
         const tV = Math.round(Math.random())
         let prodId = 0
-        let saleId = 0
+        let saleId : number | null = 0
         if (tV) {
             //Temos de saber qual a linha de venda e qual o produto
             //vendas do cliente, buscar o id
-           ({prodId, saleId} = await getProdIdSaleId(idCliente))
+            try {
+                ({prodId, saleId} = await getProdIdSaleId(idCliente))
+            } catch (err) {
+                saleId = null
+                prodId = Math.random
+            }
+           
         }
         if(prodId)
         const dataA: Date = DateGenerator.getRandomDateInRange(
