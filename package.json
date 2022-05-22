@@ -3,6 +3,7 @@
     "@types/tedious": "^4.0.7",
     "csv-parser": "^3.0.0",
     "ean-generator": "^0.0.8",
+    "lorem-ipsum": "^2.0.4",
     "randexp": "^0.5.3",
     "random-date-generator": "^1.0.2",
     "randomstring": "^1.2.2",

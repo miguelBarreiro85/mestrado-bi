@@ -25,16 +25,16 @@ interface linhaCompra {
 function insertCompras() {
   return new Promise<compra[]>(async (resolve, reject) => {
     const fIds = [1, 2, 3, 4, 5];
-    let startDate = new Date(2000, 2, 2);
+    let startDate = new Date(2000, 1, 1);
     let endDate = new Date(2022, 5, 10);
     const compras: compra[] = [];
-    for (let i = 0; i < 150000; i++) {
+    for (let i = 0; i < 20000; i++) {
       const dataCompra: Date = DateGenerator.getRandomDateInRange(
         startDate,
         endDate
       );
       const compra: compra = {
-        id_fornecedor: Math.floor(Math.random() * 4),
+        id_fornecedor: Math.floor(Math.random() * 4) + 1,
         data: dataCompra.toLocaleDateString(),
         data_vencimento: new Date(
           dataCompra.setMonth(dataCompra.getMonth() + 2)
@@ -63,9 +63,14 @@ function insertCompras() {
       nullable: false,
     });
 
+    const comprasSorted = compras.sort((a,b) => {
+      const ad = new Date(a.data)
+      const ab = new Date(b.data)
+      return ad.getTime() < ab.getTime() ? -1 : 1
+    })
     // execute
     // @ts-ignore
-    connection.execBulkLoad(bulkLoad, compras);
+    connection.execBulkLoad(bulkLoad, comprasSorted);
   });
 }
 
@@ -89,8 +94,8 @@ function getLastPrice(pID: number): Promise<number> {
 
     request.on("row", (columns) => {
       columns.forEach((column) => {
-        if (column.value === null) {
-          console.log("NULL");
+        if (column.value === null || column.value === undefined) {
+          console.log("NULL or und");
         } else {
           console.log("VALUE:", column.value);
         }
@@ -100,23 +105,53 @@ function getLastPrice(pID: number): Promise<number> {
   });
 }
 
-function insertRows(): Promise<boolean> {
-  return new Promise(async (resolve, reject) => {
-    const cIds = [...Array(150000).keys()];
-    const linhasCompra: linhaCompra[] = [];
+const updateCompra = (linhasCompra: linhaCompra[], idC: number) =>
+  new Promise((resolve, reject) => {
+    const request = new Request(
+      "update dbo.compra set total=@total, total_iva=@totalIva where id=@idC ",
+      (err: any, rowCount: number) => {
+        if (err) {
+          console.log(err)
+          reject(false);
+        }
+      }
+    );
+    const total = linhasCompra.reduce(
+      (prev, cur, i) => {
+        if (cur.id_compra === idC) {
+          return prev + cur.preco_unit * cur.quantidade
+        }
+        return prev        
+      },0);
+    request.addParameter("total", TYPES.Float, total);
+    request.addParameter("totalIVa", TYPES.Float, total * 1.23);
+    request.addParameter("idC", TYPES.Int, idC);
+    request.on("requestCompleted", () => resolve(true));
+    connection.execSql(request);
+  });
 
-    cIds.forEach(async (v) => {
-      const pID = Math.floor(Math.random() * 1000);
-      const preco_unit: number = await getLastPrice(pID);
-      const lc: linhaCompra = {
-        id_compra: v,
-        id_produto: pID,
-        preco_unit: preco_unit,
-        quantidade: Math.floor(Math.random() * (10 - 1) + 1),
-        preco_unit_iva: preco_unit * 1.23,
-      };
-      linhasCompra.push(lc);
-    });
+async function insertRows(): Promise<boolean> {
+  return new Promise(async (resolve, reject) => {
+    const linhasCompras: linhaCompra[] = [];
+
+    for (let cId = 1; cId <= 20000; cId++){ 
+      const numProdutosVenda = Math.floor(Math.random() * 9) + 1;
+      const linhasCompra: linhaCompra[] = []
+      for (let i = 0; i< numProdutosVenda; i++) {
+        const pID = Math.floor(Math.random() * 999) + 1;
+        const preco_unit: number = await getLastPrice(pID);
+        const lc: linhaCompra = {
+          id_compra: cId,
+          id_produto: pID,
+          preco_unit: preco_unit,
+          quantidade: Math.floor(Math.random() * (10 - 1) + 1),
+          preco_unit_iva: preco_unit * 1.23,
+        };
+        linhasCompra.push(lc);
+      }
+      await updateCompra(linhasCompra,cId)
+      linhasCompras.push(...linhasCompra)
+    };
     
 
     const bulkLoad = connection.newBulkLoad(
@@ -140,7 +175,7 @@ function insertRows(): Promise<boolean> {
 
     // execute
     // @ts-ignore
-    connection.execBulkLoad(bulkLoad, compras);
+    connection.execBulkLoad(bulkLoad, linhasCompras);
   });
 }
 
