@@ -12,12 +12,17 @@ interface assistenciaI {
    id_produto:number
    id_funcionario: number
    id_pessoa: number
-   id_linha_venda?:  number
-   horas_trabalho?: number
-   avaria?:string
-   data?:string
-   descricao_rep?:string
-   total?:number
+   id_linha_venda?:  number | null
+   horas_trabalho: number
+   avaria:string
+   data:string
+   descricao_rep:string
+   total:number
+}
+
+interface funcI {
+  id:number
+  precoH:number
 }
 
 const getClientsFromLeiria = () : Promise<number[]> => new Promise((resolve,reject) => {
@@ -44,52 +49,136 @@ const getClientsFromLeiria = () : Promise<number[]> => new Promise((resolve,reje
       connection.execSql(request);
 })
 const insertAssistencias = () => new Promise( async (resolve,reject) => {
-    //procurar funcionario
-    //procurar pessoa
-    //procurar produto
-    //procurar linha de venda
-    //gerar texto aleatorio para descricao e avaria
-    //calcular total com base no preco_hora e horas de trabalho
     let startDate = new Date(2000, 1, 1);
     let endDate = new Date(2022, 5, 10);
     const cIds = await getClientsFromLeiria()
-    for(let i=0; i< 1000; i++) {
-        const idCliente = cIds[Math.round(Math.random() * cIds.length)]
-        const tV = Math.round(Math.random())
-        let prodId = 0
-        let saleId : number | null = 0
-        if (tV) {
+    const funcs = await getFuncionarios()
+    const assistencias : assistenciaI[] = []
+    for(let i=0; i< 500; i++) {
+        const horasT = Math.round(Math.random() * 3) + 1
+        const funcId = Math.round(Math.random() * 39) + 1
+        const func  =  funcs.filter(func => func.id === funcId)[0]  
+        
+        const idCliente = cIds[Math.round(Math.random() * (cIds.length - 1)) + 1]
+        const hasSale = Math.round(Math.random())
+        let prodId = Math.round(Math.random() * 1000) + 1
+        let saleId : number | null = null
+        if (hasSale) {
             //Temos de saber qual a linha de venda e qual o produto
             //vendas do cliente, buscar o id
             try {
-                ({prodId, saleId} = await getProdIdSaleId(idCliente))
+              ({prodId, saleId}= await getProdIdSaleId(idCliente))
             } catch (err) {
-                saleId = null
-                prodId = Math.random
             }
            
         }
-        if(prodId)
-        const dataA: Date = DateGenerator.getRandomDateInRange(
+        const dataA : Date = DateGenerator.getRandomDateInRange(
             startDate,
             endDate
           );
-          const horasT = Math.round(Math.random() * 3) + 1
+        
         const assistencia : assistenciaI = {
-            id_funcionario: Math.round(Math.random() * 39) + 1,
+            id_funcionario: funcId,
             id_pessoa: idCliente,
-            id_produto: Math.round(Math.random() * 1000) + 1,
+            id_produto: prodId,
             avaria: loremIpsum(),
             descricao_rep: loremIpsum(),
             data: dataA.toLocaleDateString(),
             horas_trabalho: horasT,
-            id_linha_venda:
-
+            id_linha_venda: saleId,
+            total: horasT * func.precoH
         }
-
+        assistencias.push(assistencia)
     }
+    
+    const bulkLoad = connection.newBulkLoad(
+      //@ts-ignore
+      "dbo.assistencia",{keepNulls: true},
+      //@ts-ignore
+      function (error, rowCount) {
+        if (error) {
+          reject(false);
+        }
+        console.log("inserted %d rows", rowCount);
+        resolve(true);
+      }
+    );
+
+    // setup your columns - always indicate whether the column is nullable
+    bulkLoad.addColumn("id_produto", TYPES.Int, { nullable: false });
+    bulkLoad.addColumn("id_funcionario", TYPES.Int, { nullable: false });
+    bulkLoad.addColumn("id_pessoa", TYPES.Int, { nullable: false });
+    bulkLoad.addColumn("id_linha_venda", TYPES.Int, { nullable: true });
+    bulkLoad.addColumn("horas_trabalho", TYPES.Float, { nullable: false });
+    bulkLoad.addColumn("avaria", TYPES.VarChar, {length:400, nullable: false });
+    bulkLoad.addColumn("data", TYPES.VarChar, {length:50, nullable: false });
+    bulkLoad.addColumn("descricao_rep", TYPES.VarChar, {length:400, nullable: false });
+    bulkLoad.addColumn("total", TYPES.Float, { nullable: false });
+    
+    
+    const assistenciasSorted = assistencias.sort((a,b) => {
+      const aD = new Date(a.data).getTime()
+      const bD = new Date(b.data).getTime()
+      return aD < bD ? -1 : 1
+
+    })
+
+    // @ts-ignore
+    connection.execBulkLoad(bulkLoad, assistenciasSorted);
 })
 
-const getProdIdSaleId = (cId) : Promise<{prodId:number, saleId:number}> => new Promise((resolve,reject) => {
-    resolve({prodId: 0, saleId: 0})
+
+const getFuncionarios = () : Promise<funcI[]> => new Promise((resolve,reject) => {
+  const funcs : funcI[] = []
+  const request = new Request(
+    "select id, preco_hora from dbo.funcionario",
+    (err: any, rowCount: number) => {
+      if (err) {
+        reject(false);
+      }
+    }
+  );
+  request.on("row", (columns: any) => {
+    funcs.push({id: columns[0].value, precoH: columns[1].value});
+  });
+  request.on("requestCompleted", () => resolve(funcs));
+  connection.execSql(request);
+});
+
+const getProdIdSaleId = (cId : number) : Promise<{prodId:number, saleId:number}> => new Promise((resolve,reject) => {
+  const res : any = {}
+  const request = new Request(
+    "select TOP 1 id_venda, id_produto from dbo.linha_venda lv inner join dbo.venda v on v.id = lv.id_venda and v.id_pessoa = @cId ",
+    (err: any, rowCount: number) => {
+      if (err) {
+        reject(false);
+      }
+      if(rowCount === 0) {
+        reject(false)
+      }
+    }
+  );
+  request.on("row", (columns: any) => {
+    res.saleId = columns[0].value
+    res.prodId = columns[1].value
+  });
+  request.addParameter('cId',TYPES.Int,cId)
+  request.on("requestCompleted", () => resolve(res));
+  connection.execSql(request);
 })
+
+connection.on("connect", async function (err) {
+  if (err) {
+    console.log("ERROR", err);
+    return;
+  }
+  // await insertSales().catch((e: any) => {
+  //   console.log(e);
+  // });
+  await insertAssistencias().catch((e: any) => {
+    console.log(e);
+  });
+  connection.close();
+});
+
+connection.connect();
